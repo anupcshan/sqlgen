@@ -304,18 +304,21 @@ func prefixDirectory(directory string, names []string) []string {
 	return ret
 }
 
-// buildMap handles the case where the space is so sparse a map is a reasonable fallback.
-// It's a rare situation but has simple code.
 func (g *Generator) build(fields []Field, typeName string) {
+	queryClass := fmt.Sprintf("%sQuery", typeName)
 	log.Printf("Type: %s Fields: %v\n", typeName, fields)
-	g.Printf("type %sQuery struct {\n", typeName)
+	g.Printf("type %s struct {\n", queryClass)
 	g.Printf("db *sql.DB\n")
 	g.Printf("}\n")
-	g.Printf("func New%sQuery(db *sql.DB) (*%sQuery, error){\n", typeName, typeName)
-	g.Printf("return &%sQuery{db: db}, nil", typeName)
+	g.Printf("func New%s(db *sql.DB) (*%s, error){\n", queryClass, queryClass)
+	g.Printf("return &%s{db: db}, nil", queryClass)
 	g.Printf("}\n")
 	for _, field := range fields {
-		g.Printf("func (q *%sQuery) By%s(%s %s) (*%s, error) {\n", typeName, field.name, field.name, field.srcType, typeName)
+		if field.isPK {
+			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.name, field.name, field.srcType, typeName)
+		} else {
+			g.Printf("func (q *%s) By%s(%s %s) ([]*%s, error) {\n", queryClass, field.name, field.name, field.srcType, typeName)
+		}
 		g.Printf("return nil, nil\n")
 		g.Printf("}\n")
 	}
