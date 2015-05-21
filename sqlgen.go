@@ -118,9 +118,10 @@ type File struct {
 
 // Value represents a declared field.
 type Field struct {
-	name    string // The name of the field.
+	srcName string // Field name in source
+	dbName  string // Field name in DB
 	isPK    bool   // Is the field a primary key?
-	srcType string // Field type in code
+	srcType string // Field type in source
 	dbType  string // Expected field type in the DB
 }
 
@@ -265,7 +266,8 @@ func (f *File) genDecl(node ast.Node) bool {
 
 						f.fields = append(f.fields,
 							Field{
-								name:    fieldName,
+								srcName: fieldName,
+								dbName:  strings.ToLower(fieldName), // TODO: Override with annotations
 								isPK:    isPK,
 								srcType: ident.Name,
 								dbType:  "string",
@@ -305,7 +307,11 @@ func prefixDirectory(directory string, names []string) []string {
 }
 
 const newQueryDefn = `func New%[1]s(db *sql.DB) (*%[1]s, error) {
-	return &%[1]s{db: db}, nil
+	q := &%[1]s{db: db}
+	if err := q.Validate(); err != nil {
+		return nil, err
+	}
+	return q, nil
 }
 `
 
@@ -317,7 +323,7 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("type %s struct {\n", queryClass)
 	g.Printf("db *sql.DB\n")
 	for _, field := range fields {
-		g.Printf("by%s *sql.Stmt\n", field.name)
+		g.Printf("by%s *sql.Stmt\n", field.srcName)
 	}
 	g.Printf("}\n")
 	// -- Query definition END
@@ -328,21 +334,21 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("func (q *%s) Validate() error {\n", queryClass)
 	for _, field := range fields {
 		g.Printf(`if stmt, err := q.db.Prepare("SELECT * FROM %s WHERE %s = $1;"); err != nil {
-			`, typeName, field.name)
+			`, typeName, field.dbName)
 		g.Printf("return err\n")
 		g.Printf("} else {\n")
-		g.Printf("q.by%s = stmt\n", field.name)
+		g.Printf("q.by%s = stmt\n", field.srcName)
 		g.Printf("}\n")
 	}
 	g.Printf("return nil\n")
 	g.Printf("}\n")
-
 	// -- Validate method END
+
 	for _, field := range fields {
 		if field.isPK {
-			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.name, field.name, field.srcType, typeName)
+			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
 		} else {
-			g.Printf("func (q *%s) By%s(%s %s) ([]*%s, error) {\n", queryClass, field.name, field.name, field.srcType, typeName)
+			g.Printf("func (q *%s) By%s(%s %s) ([]*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
 		}
 		g.Printf("return nil, nil\n")
 		g.Printf("}\n")
