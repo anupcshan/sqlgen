@@ -224,6 +224,23 @@ func (g *Generator) generate(typeName string) {
 	g.build(fields, typeName)
 }
 
+type KnownSrcType string
+
+const (
+	INT64 KnownSrcType = "int64"
+)
+
+type KnownDBType string
+
+const (
+	DBINTEGER KnownDBType = "INTEGER"
+	DBBIGINT  KnownDBType = "BIGINT"
+)
+
+var KNOWN_TYPE_MAP = map[KnownSrcType][]KnownDBType{
+	INT64: []KnownDBType{DBINTEGER, DBBIGINT},
+}
+
 // genDecl processes one declaration clause.
 func (f *File) genDecl(node ast.Node) bool {
 	decl, ok := node.(*ast.GenDecl)
@@ -254,7 +271,9 @@ func (f *File) genDecl(node ast.Node) bool {
 				log.Printf("Field: %v\n", field)
 
 				if ident, ok := field.Type.(*ast.Ident); ok {
-					log.Printf("Ident: %v\n", ident.Name)
+					log.Printf("Primitive or local type found: %v\n", ident.Name)
+
+					// TODO: Look at list of known types and determine if we have a translation.
 
 					if len(field.Names) == 1 {
 						fieldName := field.Names[0].Name
@@ -273,6 +292,10 @@ func (f *File) genDecl(node ast.Node) bool {
 								dbType:  "string",
 							})
 					}
+				} else if selector, ok := field.Type.(*ast.SelectorExpr); ok {
+					log.Printf("Found selector: %s :: %s\n", selector.X, selector.Sel.Name)
+				} else {
+					log.Printf("UNKNOWN TYPE %s seen\n", field.Type)
 				}
 			}
 		}
@@ -344,13 +367,40 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("}\n")
 	// -- Validate method END
 
+	var fieldPtrs bytes.Buffer
+	for i, field := range fields {
+		if i != 0 {
+			fieldPtrs.WriteString(", ")
+		}
+		fieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+	}
+
 	for _, field := range fields {
 		if field.isPK {
 			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
+			g.Printf("row := q.by%s.QueryRow(%s)\n", field.srcName, field.srcName)
+			g.Printf("obj := new(%s)\n", typeName)
+			g.Printf("if err := row.Scan(%s); err != nil {\n", fieldPtrs.String())
+			g.Printf("return nil, err\n")
+			g.Printf("}\n")
+			g.Printf("return obj, nil\n")
 		} else {
 			g.Printf("func (q *%s) By%s(%s %s) ([]*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
+			g.Printf("if rows, err := q.by%s.Query(%s); err != nil {\n", field.srcName, field.srcName)
+			g.Printf("return nil, err\n")
+			g.Printf("} else {\n")
+			g.Printf("arr := []*%s{}\n", typeName)
+			g.Printf("for rows.Next() {\n")
+			g.Printf("obj := new(%s)\n", typeName)
+			g.Printf("if err := rows.Scan(%s); err != nil {\n", fieldPtrs.String())
+			g.Printf("return nil, err\n")
+			g.Printf("}\n")
+			// TODO: This is a fairly expensive operation. Can we do better?
+			g.Printf("arr = append(arr, obj)\n")
+			g.Printf("}\n")
+			g.Printf("return arr, nil\n")
+			g.Printf("}\n")
 		}
-		g.Printf("return nil, nil\n")
 		g.Printf("}\n")
 	}
 }
