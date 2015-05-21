@@ -304,15 +304,40 @@ func prefixDirectory(directory string, names []string) []string {
 	return ret
 }
 
+const newQueryDefn = `func New%[1]s(db *sql.DB) (*%[1]s, error) {
+	return &%[1]s{db: db}, nil
+}
+`
+
 func (g *Generator) build(fields []Field, typeName string) {
 	queryClass := fmt.Sprintf("%sQuery", typeName)
 	log.Printf("Type: %s Fields: %v\n", typeName, fields)
+
+	// -- Query definition BEGIN
 	g.Printf("type %s struct {\n", queryClass)
 	g.Printf("db *sql.DB\n")
+	for _, field := range fields {
+		g.Printf("by%s *sql.Stmt\n", field.name)
+	}
 	g.Printf("}\n")
-	g.Printf("func New%s(db *sql.DB) (*%s, error){\n", queryClass, queryClass)
-	g.Printf("return &%s{db: db}, nil", queryClass)
+	// -- Query definition END
+
+	g.Printf(newQueryDefn, queryClass)
+
+	// -- Validate method BEGIN
+	g.Printf("func (q *%s) Validate() error {\n", queryClass)
+	for _, field := range fields {
+		g.Printf(`if stmt, err := q.db.Prepare("SELECT * FROM %s WHERE %s = $1;"); err != nil {
+			`, typeName, field.name)
+		g.Printf("return err\n")
+		g.Printf("} else {\n")
+		g.Printf("q.by%s = stmt\n", field.name)
+		g.Printf("}\n")
+	}
+	g.Printf("return nil\n")
 	g.Printf("}\n")
+
+	// -- Validate method END
 	for _, field := range fields {
 		if field.isPK {
 			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.name, field.name, field.srcType, typeName)
