@@ -381,6 +381,7 @@ const newQueryDefn = `func New%[1]s(db *sql.DB) (*%[1]s, error) {
 
 func (g *Generator) build(fields []Field, typeName string) {
 	queryClass := fmt.Sprintf("%sQuery", typeName)
+	queryTransactionClass := fmt.Sprintf("%sQueryTxn", typeName)
 	tableName := strings.ToLower(typeName)
 	log.Printf("Type: %s Fields: %v\n", typeName, fields)
 
@@ -392,6 +393,13 @@ func (g *Generator) build(fields []Field, typeName string) {
 	}
 	g.Printf("}\n")
 	// -- Query definition END
+
+	// -- Query transaction definition BEGIN
+	g.Printf("type %s struct {\n", queryTransactionClass)
+	g.Printf("tx *sql.Tx\n")
+	g.Printf("q *%s", queryClass)
+	g.Printf("}\n")
+	// -- Query transaction definition END
 
 	g.Printf(newQueryDefn, queryClass)
 
@@ -419,6 +427,16 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("return nil\n")
 	g.Printf("}\n")
 	// -- Validate method END
+
+	// -- Create new transaction BEGIN
+	g.Printf("func (q *%s) Transaction() (*%s, error) {\n", queryClass, queryTransactionClass)
+	g.Printf("if tx, err := q.db.Begin(); err != nil {\n")
+	g.Printf("return nil, err\n")
+	g.Printf("} else {\n")
+	g.Printf("return &%s{tx: tx, q: q}, nil\n", queryTransactionClass)
+	g.Printf("}\n")
+	g.Printf("}\n")
+	// -- Create new transaction END
 
 	for _, field := range fields {
 		if field.isPK {
