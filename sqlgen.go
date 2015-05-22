@@ -381,6 +381,7 @@ const newQueryDefn = `func New%[1]s(db *sql.DB) (*%[1]s, error) {
 
 func (g *Generator) build(fields []Field, typeName string) {
 	queryClass := fmt.Sprintf("%sQuery", typeName)
+	tableName := strings.ToLower(typeName)
 	log.Printf("Type: %s Fields: %v\n", typeName, fields)
 
 	// -- Query definition BEGIN
@@ -394,11 +395,22 @@ func (g *Generator) build(fields []Field, typeName string) {
 
 	g.Printf(newQueryDefn, queryClass)
 
+	var srcFieldPtrs bytes.Buffer
+	var dbFieldNames bytes.Buffer
+	for i, field := range fields {
+		if i != 0 {
+			srcFieldPtrs.WriteString(", ")
+			dbFieldNames.WriteString(",")
+		}
+		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+		dbFieldNames.WriteString(field.dbName)
+	}
+
 	// -- Validate method BEGIN
 	g.Printf("func (q *%s) Validate() error {\n", queryClass)
 	for _, field := range fields {
-		g.Printf(`if stmt, err := q.db.Prepare("SELECT * FROM %s WHERE %s = $1;"); err != nil {
-			`, typeName, field.dbName)
+		g.Printf(`if stmt, err := q.db.Prepare("SELECT %s FROM %s WHERE %s = $1;"); err != nil {
+			`, dbFieldNames.String(), tableName, field.dbName)
 		g.Printf("return err\n")
 		g.Printf("} else {\n")
 		g.Printf("q.by%s = stmt\n", field.srcName)
@@ -408,20 +420,12 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("}\n")
 	// -- Validate method END
 
-	var fieldPtrs bytes.Buffer
-	for i, field := range fields {
-		if i != 0 {
-			fieldPtrs.WriteString(", ")
-		}
-		fieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
-	}
-
 	for _, field := range fields {
 		if field.isPK {
 			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
 			g.Printf("row := q.by%s.QueryRow(%s)\n", field.srcName, field.srcName)
 			g.Printf("obj := new(%s)\n", typeName)
-			g.Printf("if err := row.Scan(%s); err != nil {\n", fieldPtrs.String())
+			g.Printf("if err := row.Scan(%s); err != nil {\n", srcFieldPtrs.String())
 			g.Printf("return nil, err\n")
 			g.Printf("}\n")
 			g.Printf("return obj, nil\n")
@@ -433,7 +437,7 @@ func (g *Generator) build(fields []Field, typeName string) {
 			g.Printf("arr := []*%s{}\n", typeName)
 			g.Printf("for rows.Next() {\n")
 			g.Printf("obj := new(%s)\n", typeName)
-			g.Printf("if err := rows.Scan(%s); err != nil {\n", fieldPtrs.String())
+			g.Printf("if err := rows.Scan(%s); err != nil {\n", srcFieldPtrs.String())
 			g.Printf("return nil, err\n")
 			g.Printf("}\n")
 			// TODO: This is a fairly expensive operation. Can we do better?
