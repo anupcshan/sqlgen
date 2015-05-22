@@ -224,21 +224,52 @@ func (g *Generator) generate(typeName string) {
 	g.build(fields, typeName)
 }
 
-type KnownSrcType string
+//go:generate stringer -type=SourceType
+type SourceType int
 
 const (
-	INT64 KnownSrcType = "int64"
+	ST_UNKNOWN SourceType = iota
+	ST_INT64
+	ST_INT
+	ST_STRING
 )
+
+var KNOWN_SOURCE_TYPES = map[string]SourceType{
+	"int64":  ST_INT64,
+	"int":    ST_INT,
+	"string": ST_STRING,
+}
 
 type KnownDBType string
 
 const (
-	DBINTEGER KnownDBType = "INTEGER"
-	DBBIGINT  KnownDBType = "BIGINT"
+	DB_INTEGER KnownDBType = "INTEGER"
+	DB_BIGINT  KnownDBType = "BIGINT"
+	DB_VARCHAR KnownDBType = "VARCHAR"
 )
 
-var KNOWN_TYPE_MAP = map[KnownSrcType][]KnownDBType{
-	INT64: []KnownDBType{DBINTEGER, DBBIGINT},
+type GenericType int
+
+//go:generate stringer -type=GenericType
+const (
+	GT_NUMERIC GenericType = iota
+	GT_STRING
+)
+
+var SRCTYPE_TO_GENERICTYPE_MAP = map[SourceType]GenericType{
+	ST_INT64:  GT_NUMERIC,
+	ST_INT:    GT_NUMERIC,
+	ST_STRING: GT_STRING,
+}
+
+var GENERICTYPE_TO_DBTYPE_MAP = map[GenericType][]KnownDBType{
+	GT_NUMERIC: []KnownDBType{DB_INTEGER, DB_BIGINT},
+	GT_STRING:  []KnownDBType{DB_VARCHAR},
+}
+
+func srcTypeToFirstDbType(srcType SourceType) KnownDBType {
+	genericType := SRCTYPE_TO_GENERICTYPE_MAP[srcType]
+	return GENERICTYPE_TO_DBTYPE_MAP[genericType][0]
 }
 
 // genDecl processes one declaration clause.
@@ -271,9 +302,17 @@ func (f *File) genDecl(node ast.Node) bool {
 				log.Printf("Field: %v\n", field)
 
 				if ident, ok := field.Type.(*ast.Ident); ok {
-					log.Printf("Primitive or local type found: %v\n", ident.Name)
+					// Look at list of known types and determine if we have a translation.
+					tp := KNOWN_SOURCE_TYPES[ident.Name]
 
-					// TODO: Look at list of known types and determine if we have a translation.
+					if tp != ST_UNKNOWN {
+						log.Printf("Primitive or local type found: %v => %s\n", ident.Name, tp.String())
+					} else {
+						// TODO: We should probably consider all of these fields as local objects and add
+						// foreign key links.
+						log.Printf("UNRECOGNIZED LOCAL TYPE %v seen\n", ident.Name)
+						continue
+					}
 
 					if len(field.Names) == 1 {
 						fieldName := field.Names[0].Name
@@ -293,9 +332,11 @@ func (f *File) genDecl(node ast.Node) bool {
 							})
 					}
 				} else if selector, ok := field.Type.(*ast.SelectorExpr); ok {
+					// TODO: This likely means an object in another package. Foreign link?
 					log.Printf("Found selector: %s :: %s\n", selector.X, selector.Sel.Name)
 				} else {
-					log.Printf("UNKNOWN TYPE %s seen\n", field.Type)
+					// TODO: Enumerate all different possible types here.
+					log.Printf("UNKNOWN TYPE %v seen\n", field.Type)
 				}
 			}
 		}
