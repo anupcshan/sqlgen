@@ -489,8 +489,8 @@ func (g *Generator) build(fields []Field, typeName string) {
 
 	for _, field := range fields {
 		if field.isPK {
-			g.Printf("func (q *%s) By%s(%s %s) (*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
-			g.Printf("row := q.by%s.QueryRow(%s)\n", field.srcName, field.srcName)
+			g.Printf("func (tq *%s) By%s(%s %s) (*%s, error) {\n", queryTransactionClass, field.srcName, field.srcName, field.srcType, typeName)
+			g.Printf("row := tq.tx.Stmt(tq.q.by%s).QueryRow(%s)\n", field.srcName, field.srcName)
 			g.Printf("obj := new(%s)\n", typeName)
 			g.Printf("if err := row.Scan(%s); err != nil {\n", srcFieldPtrs.String())
 			g.Printf("return nil, err\n")
@@ -500,10 +500,10 @@ func (g *Generator) build(fields []Field, typeName string) {
 			// TODO: Returning channels is a slightly dangerous operation. There is a possibility this
 			// channel will not be completely consumed by the receiver. In that case, close() never gets
 			// called on the channels and causes a memory leak.
-			g.Printf("func (q *%s) By%s(%s %s) (chan<- *%s, chan<- error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
+			g.Printf("func (tq *%s) By%s(%s %s) (chan<- *%s, chan<- error) {\n", queryTransactionClass, field.srcName, field.srcName, field.srcType, typeName)
 			g.Printf("objChan := make(chan *%s, 10)\n", typeName)
 			g.Printf("errChan := make(chan error, 10)\n")
-			g.Printf("if rows, err := q.by%s.Query(%s); err != nil {\n", field.srcName, field.srcName)
+			g.Printf("if rows, err := tq.tx.Stmt(tq.q.by%s).Query(%s); err != nil {\n", field.srcName, field.srcName)
 			g.Printf("errChan <- err\n")
 			g.Printf("} else {\n")
 			g.Printf("go func() {\n")
