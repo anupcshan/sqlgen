@@ -497,21 +497,28 @@ func (g *Generator) build(fields []Field, typeName string) {
 			g.Printf("}\n")
 			g.Printf("return obj, nil\n")
 		} else {
-			g.Printf("func (q *%s) By%s(%s %s) ([]*%s, error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
+			// TODO: Returning channels is a slightly dangerous operation. There is a possibility this
+			// channel will not be completely consumed by the receiver. In that case, close() never gets
+			// called on the channels and causes a memory leak.
+			g.Printf("func (q *%s) By%s(%s %s) (chan<- *%s, chan<- error) {\n", queryClass, field.srcName, field.srcName, field.srcType, typeName)
+			g.Printf("objChan := make(chan *%s, 10)\n", typeName)
+			g.Printf("errChan := make(chan error, 10)\n")
 			g.Printf("if rows, err := q.by%s.Query(%s); err != nil {\n", field.srcName, field.srcName)
-			g.Printf("return nil, err\n")
+			g.Printf("errChan <- err\n")
 			g.Printf("} else {\n")
-			g.Printf("arr := []*%s{}\n", typeName)
+			g.Printf("go func() {\n")
 			g.Printf("for rows.Next() {\n")
 			g.Printf("obj := new(%s)\n", typeName)
 			g.Printf("if err := rows.Scan(%s); err != nil {\n", srcFieldPtrs.String())
-			g.Printf("return nil, err\n")
+			g.Printf("errChan <- err\n")
 			g.Printf("}\n")
-			// TODO: This is a fairly expensive operation. Can we do better?
-			g.Printf("arr = append(arr, obj)\n")
+			g.Printf("objChan <- obj")
 			g.Printf("}\n")
-			g.Printf("return arr, nil\n")
+			g.Printf("close(objChan)\n")
+			g.Printf("close(errChan)\n")
+			g.Printf("}()\n")
 			g.Printf("}\n")
+			g.Printf("return objChan, errChan")
 		}
 		g.Printf("}\n")
 	}
