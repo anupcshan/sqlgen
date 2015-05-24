@@ -94,8 +94,9 @@ func main() {
 // Generator holds the state of the analysis. Primarily used to buffer
 // the output for format.Source.
 type Generator struct {
-	buf bytes.Buffer // Accumulated output.
-	pkg *Package     // Package we are scanning.
+	buf               bytes.Buffer // Accumulated output.
+	pkg               *Package     // Package we are scanning.
+	additionalImports []string
 }
 
 type Package struct {
@@ -112,8 +113,9 @@ type File struct {
 	file *ast.File // Parsed AST.
 
 	// Following fields are reset for each type being generated.
-	typeName string  // Name of the struct type.
-	fields   []Field // Accumulator for fields of that type.
+	typeName          string  // Name of the struct type.
+	fields            []Field // Accumulator for fields of that type.
+	additionalImports []string
 }
 
 // Value represents a declared field.
@@ -213,6 +215,7 @@ func (g *Generator) generate(typeName string) {
 		file.fields = nil
 		if file.file != nil {
 			ast.Inspect(file.file, file.genDecl)
+			g.additionalImports = append(g.additionalImports, file.additionalImports...)
 			fields = append(fields, file.fields...)
 		}
 	}
@@ -232,20 +235,23 @@ const (
 	ST_INT64
 	ST_INT
 	ST_STRING
+	ST_TIME
 )
 
 var KNOWN_SOURCE_TYPES = map[string]SourceType{
-	"int64":  ST_INT64,
-	"int":    ST_INT,
-	"string": ST_STRING,
+	"int64":     ST_INT64,
+	"int":       ST_INT,
+	"string":    ST_STRING,
+	"time.Time": ST_TIME,
 }
 
 type KnownDBType string
 
 const (
-	DB_INTEGER KnownDBType = "INTEGER"
-	DB_BIGINT  KnownDBType = "BIGINT"
-	DB_VARCHAR KnownDBType = "VARCHAR"
+	DB_INTEGER   KnownDBType = "INTEGER"
+	DB_BIGINT    KnownDBType = "BIGINT"
+	DB_VARCHAR   KnownDBType = "VARCHAR"
+	DB_TIMESTAMP KnownDBType = "TIMESTAMP"
 )
 
 type GenericType int
@@ -254,17 +260,20 @@ type GenericType int
 const (
 	GT_NUMERIC GenericType = iota
 	GT_STRING
+	GT_TIMESTAMP
 )
 
 var SRCTYPE_TO_GENERICTYPE_MAP = map[SourceType]GenericType{
 	ST_INT64:  GT_NUMERIC,
 	ST_INT:    GT_NUMERIC,
 	ST_STRING: GT_STRING,
+	ST_TIME:   GT_TIMESTAMP,
 }
 
 var GENERICTYPE_TO_DBTYPE_MAP = map[GenericType][]KnownDBType{
-	GT_NUMERIC: []KnownDBType{DB_INTEGER, DB_BIGINT},
-	GT_STRING:  []KnownDBType{DB_VARCHAR},
+	GT_NUMERIC:   []KnownDBType{DB_INTEGER, DB_BIGINT},
+	GT_STRING:    []KnownDBType{DB_VARCHAR},
+	GT_TIMESTAMP: []KnownDBType{DB_TIMESTAMP},
 }
 
 func srcTypeToFirstDbType(srcType SourceType) KnownDBType {
@@ -310,7 +319,7 @@ func (f *File) genDecl(node ast.Node) bool {
 					} else {
 						// TODO: We should probably consider all of these fields as local objects and add
 						// foreign key links.
-						log.Printf("UNRECOGNIZED LOCAL TYPE %v seen\n", ident.Name)
+						log.Printf("UNRECOGNIZED LOCAL TYPE seen: %v\n", ident.Name)
 						continue
 					}
 
@@ -334,9 +343,40 @@ func (f *File) genDecl(node ast.Node) bool {
 				} else if selector, ok := field.Type.(*ast.SelectorExpr); ok {
 					// TODO: This likely means an object in another package. Foreign link?
 					log.Printf("Found selector: %s :: %s\n", selector.X, selector.Sel.Name)
+					typeName := fmt.Sprintf("%s.%s", selector.X, selector.Sel.Name)
+
+					tp := KNOWN_SOURCE_TYPES[typeName]
+
+					if tp != ST_UNKNOWN {
+						log.Printf("Primitive or local type found: %v => %s\n", typeName, tp.String())
+						f.additionalImports = append(f.additionalImports, fmt.Sprintf("%s", selector.X))
+					} else {
+						// TODO: We should probably consider all of these fields as local objects and add
+						// foreign key links.
+						log.Printf("UNRECOGNIZED LOCAL TYPE seen: %v\n", typeName)
+						continue
+					}
+
+					if len(field.Names) == 1 {
+						fieldName := field.Names[0].Name
+						isPK := false
+
+						if strings.ToLower(fieldName) == "id" {
+							isPK = true
+						}
+
+						f.fields = append(f.fields,
+							Field{
+								srcName: fieldName,
+								dbName:  strings.ToLower(fieldName), // TODO: Override with annotations
+								isPK:    isPK,
+								srcType: typeName,
+								dbType:  "string",
+							})
+					}
 				} else {
 					// TODO: Enumerate all different possible types here.
-					log.Printf("UNKNOWN TYPE %v seen\n", field.Type)
+					log.Printf("UNKNOWN TYPE seen: %v\n", field.Type)
 				}
 			}
 		}
@@ -379,7 +419,16 @@ const newQueryDefn = `func New%[1]s(db *sql.DB) (*%[1]s, error) {
 }
 `
 
+func (g *Generator) printAdditionalImports() {
+	for _, impt := range g.additionalImports {
+		g.Printf("import \"%s\"\n", impt)
+	}
+
+	g.additionalImports = []string{}
+}
+
 func (g *Generator) build(fields []Field, typeName string) {
+	g.printAdditionalImports()
 	queryClass := fmt.Sprintf("%sQuery", typeName)
 	queryTransactionClass := fmt.Sprintf("%sQueryTxn", typeName)
 	tableName := strings.ToLower(typeName)
