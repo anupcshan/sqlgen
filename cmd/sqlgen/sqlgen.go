@@ -437,6 +437,7 @@ func (g *Generator) build(fields []Field, typeName string) {
 	// -- Query definition BEGIN
 	g.Printf("type %s struct {\n", queryClass)
 	g.Printf("db *sql.DB\n")
+	g.Printf("create *sql.Stmt\n")
 	for _, field := range fields {
 		g.Printf("by%s *sql.Stmt\n", field.srcName)
 	}
@@ -454,17 +455,28 @@ func (g *Generator) build(fields []Field, typeName string) {
 
 	var srcFieldPtrs bytes.Buffer
 	var dbFieldNames bytes.Buffer
+	var placeholders bytes.Buffer
 	for i, field := range fields {
 		if i != 0 {
 			srcFieldPtrs.WriteString(", ")
 			dbFieldNames.WriteString(",")
+			placeholders.WriteString(",")
 		}
 		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
 		dbFieldNames.WriteString(field.dbName)
+		placeholders.WriteString(fmt.Sprintf("$%d", i+1))
 	}
 
 	// -- Validate method BEGIN
 	g.Printf("func (q *%s) Validate() error {\n", queryClass)
+	// -- -- Create instance BEGIN
+	g.Printf(`if stmt, err := q.db.Prepare("INSERT INTO %s(%s) VALUES(%s)"); err != nil {
+		`, tableName, dbFieldNames.String(), placeholders.String())
+	g.Printf("return err\n")
+	g.Printf("} else {\n")
+	g.Printf("q.create = stmt\n")
+	g.Printf("}\n")
+	// -- -- Create instance END
 	for _, field := range fields {
 		g.Printf(`if stmt, err := q.db.Prepare("SELECT %s FROM %s WHERE %s = $1;"); err != nil {
 			`, dbFieldNames.String(), tableName, field.dbName)
@@ -486,6 +498,12 @@ func (g *Generator) build(fields []Field, typeName string) {
 	g.Printf("}\n")
 	g.Printf("}\n")
 	// -- Create new transaction END
+
+	// -- Create new instance BEGIN
+	g.Printf("func (tq *%s) Create(obj %s) error {\n", queryTransactionClass, typeName)
+	g.Printf("return nil\n")
+	g.Printf("}\n")
+	// -- Create new instance BEGIN
 
 	for _, field := range fields {
 		if field.isPK {
