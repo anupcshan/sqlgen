@@ -28,30 +28,32 @@ var _type = Type{
 }
 
 func TestPrintAdditionalImports(t *testing.T) {
-	g := &Generator{additionalImports: []string{"time", "foo"}}
+	g := &Generator{additionalImports: []string{"time", "foo"}, sw: new(SourceWriter)}
 	expectedImports := `import "database/sql"
 import "time"
 import "foo"
 `
 	g.printImports()
-	assert.Equal(t, expectedImports, g.buf.String())
+	assert.Equal(t, expectedImports, g.sw.buf.String())
 
 	g = &Generator{
 		additionalImports: []string{"time", "foo"},
-		_type:             _type}
+		_type:             _type,
+		sw:                new(SourceWriter),
+	}
 
 	expectedQueryDecl := `type TypeNameQuery struct {
-db *sql.DB
-create *sql.Stmt
-bysrcName *sql.Stmt
-bySrcName2 *sql.Stmt
+	db *sql.DB
+	create *sql.Stmt
+	bysrcName *sql.Stmt
+	bySrcName2 *sql.Stmt
 }
 
 type TypeNameQueryTx struct {
-tx *sql.Tx
-q *TypeNameQuery
+	tx *sql.Tx
+	q *TypeNameQuery
 }
 `
 	g.printQueryDeclaration()
-	assert.Equal(t, expectedQueryDecl, g.buf.String())
+	assert.Equal(t, expectedQueryDecl, g.sw.buf.String())
 }
