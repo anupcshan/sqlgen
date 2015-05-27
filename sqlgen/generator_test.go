@@ -1,10 +1,6 @@
 package sqlgen
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
+import "testing"
 
 var _type = Type{
 	name:      "TypeName",
@@ -34,7 +30,9 @@ import "time"
 import "foo"
 `
 	g.printImports()
-	assert.Equal(t, expectedImports, g.sw.buf.String())
+	if actualImports := g.sw.buf.String(); actualImports != expectedImports {
+		t.Fatalf("Expected imports: %s\nActual imports: %s\n", expectedImports, actualImports)
+	}
 
 	g = &Generator{
 		additionalImports: []string{"time", "foo"},
@@ -55,5 +53,7 @@ type TypeNameQueryTx struct {
 }
 `
 	g.printQueryDeclaration()
-	assert.Equal(t, expectedQueryDecl, g.sw.buf.String())
+	if actualQueryDecl := g.sw.buf.String(); actualQueryDecl != expectedQueryDecl {
+		t.Fatalf("Expected imports: %s\nActual imports: %s\n", expectedQueryDecl, actualQueryDecl)
+	}
 }
