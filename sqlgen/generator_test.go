@@ -46,6 +46,11 @@ create *sql.Stmt
 bysrcName *sql.Stmt
 bySrcName2 *sql.Stmt
 }
+
+type TypeNameQueryTx struct {
+tx *sql.Tx
+q *TypeNameQuery
+}
 `
 	g.printQueryDeclaration()
 	assert.Equal(t, expectedQueryDecl, g.buf.String())

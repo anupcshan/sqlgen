@@ -37,10 +37,15 @@ func (g *Generator) printImports() {
 
 func (g *Generator) Printfln(format string, args ...interface{}) {
 	fmt.Fprintf(&g.buf, format, args...)
+	g.AddNewline()
+}
+
+func (g *Generator) AddNewline() {
 	g.buf.Write([]byte("\n"))
 }
 
 func (g *Generator) printQueryDeclaration() {
+	// -- Query definition BEGIN
 	g.Printfln("type %sQuery struct {", g._type.name)
 	g.Printfln("db *sql.DB")
 	g.Printfln("create *sql.Stmt")
@@ -48,6 +53,17 @@ func (g *Generator) printQueryDeclaration() {
 		g.Printfln("by%s *sql.Stmt", field.srcName)
 	}
 	g.Printfln("}")
+	// -- Query definition END
+
+	g.AddNewline()
+
+	// -- Query transaction definition BEGIN
+	queryTransactionClass := fmt.Sprintf("%sQueryTx", g._type.name)
+	g.Printfln("type %s struct {", queryTransactionClass)
+	g.Printfln("tx *sql.Tx")
+	g.Printfln("q *%sQuery", g._type.name)
+	g.Printfln("}")
+	// -- Query transaction definition END
 }
 
 func (g *Generator) Generate() {
