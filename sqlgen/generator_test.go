@@ -31,10 +31,12 @@ import "foo"
 `
 	g.printImports()
 	if actualImports := g.sw.buf.String(); actualImports != expectedImports {
-		t.Fatalf("Expected imports: %s\nActual imports: %s\n", expectedImports, actualImports)
+		t.Fatalf("Expected imports:\n%s\nActual imports:\n%s\n", expectedImports, actualImports)
 	}
+}
 
-	g = &Generator{
+func TestQueryDeclaration(t *testing.T) {
+	g := &Generator{
 		additionalImports: []string{"time", "foo"},
 		_type:             _type,
 		sw:                new(SourceWriter),
@@ -54,6 +56,36 @@ type TypeNameQueryTx struct {
 `
 	g.printQueryDeclaration()
 	if actualQueryDecl := g.sw.buf.String(); actualQueryDecl != expectedQueryDecl {
-		t.Fatalf("Expected imports: %s\nActual imports: %s\n", expectedQueryDecl, actualQueryDecl)
+		t.Fatalf("Expected query declaration:\n%s\nActual query declaration:\n%s\n", expectedQueryDecl, actualQueryDecl)
+	}
+}
+
+func TestPrintSchemaValidation(t *testing.T) {
+	g := &Generator{
+		additionalImports: []string{"time", "foo"},
+		_type:             _type,
+		sw:                new(SourceWriter),
+	}
+
+	expectedSchemaVal := `func (q *TypeNameQuery) Validate() error {
+	if stmt, err := q.db.Prepare("INSERT INTO tblName(dbName,dbName2) VALUES($1,$2)"); err != nil {
+		return err
+	}
+
+	if stmt, err := q.db.Prepare("SELECT dbName,dbName2 FROM tblName WHERE dbName=$1"); err != nil {
+		return err
+	}
+
+	if stmt, err := q.db.Prepare("SELECT dbName,dbName2 FROM tblName WHERE dbName2=$1"); err != nil {
+		return err
+	}
+
+	return nil
+}
+`
+
+	g.printSchemaValidation()
+	if actualSchemaVal := g.sw.buf.String(); actualSchemaVal != expectedSchemaVal {
+		t.Fatalf("Expected schema validation:\n%s\nActual schema validation:\n%s\n", expectedSchemaVal, actualSchemaVal)
 	}
 }

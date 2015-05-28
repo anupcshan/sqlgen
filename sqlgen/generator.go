@@ -57,6 +57,15 @@ func (cs *CompoundStatement) Printfln(format string, args ...interface{}) *Compo
 	return cs
 }
 
+func (cs *CompoundStatement) NewCompoundStatement(format string, args ...interface{}) *CompoundStatement {
+	return cs.sw.NewCompoundStatement(format, args...)
+}
+
+func (cs *CompoundStatement) AddNewline() *CompoundStatement {
+	cs.sw.AddNewline()
+	return cs
+}
+
 func (cs *CompoundStatement) Close() *SourceWriter {
 	cs.sw.Unindent()
 	cs.sw.Printfln("}")
@@ -121,7 +130,49 @@ func (g *Generator) printQueryDeclaration() {
 	// -- Query transaction definition END
 }
 
+func (g *Generator) printSchemaValidation() {
+	var srcFieldPtrs bytes.Buffer
+	var dbFieldNames bytes.Buffer
+	var placeholders bytes.Buffer
+	for i, field := range g._type.fields {
+		if i != 0 {
+			srcFieldPtrs.WriteString(", ")
+			dbFieldNames.WriteString(",")
+			placeholders.WriteString(",")
+		}
+		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+		dbFieldNames.WriteString(field.dbName)
+		placeholders.WriteString(fmt.Sprintf("$%d", i+1))
+	}
+
+	method := g.sw.NewCompoundStatement("func (q *%sQuery) Validate() error", g._type.name)
+	cs := method.NewCompoundStatement(`if stmt, err := q.db.Prepare("INSERT INTO %s(%s) VALUES(%s)"); err != nil`,
+		g._type.tableName, dbFieldNames.String(), placeholders.String())
+	cs.
+		Printfln("return err").
+		Close()
+
+	for _, field := range g._type.fields {
+		// TODO: Ideally, this newline would be added automatically.
+		method.AddNewline()
+
+		cs := method.NewCompoundStatement(`if stmt, err := q.db.Prepare("SELECT %s FROM %s WHERE %s=$1"); err != nil`,
+			dbFieldNames.String(), g._type.tableName, field.dbName)
+		cs.
+			Printfln("return err").
+			Close()
+	}
+
+	// TODO: Ideally, this newline would be added automatically.
+	method.AddNewline()
+
+	method.
+		Printfln("return nil").
+		Close()
+}
+
 func (g *Generator) Generate() {
 	g.printImports()
 	g.printQueryDeclaration()
+	g.printSchemaValidation()
 }
