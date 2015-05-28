@@ -89,3 +89,26 @@ func TestPrintSchemaValidation(t *testing.T) {
 		t.Fatalf("Expected schema validation:\n%s\nActual schema validation:\n%s\n", expectedSchemaVal, actualSchemaVal)
 	}
 }
+
+func TestCreateInstance(t *testing.T) {
+	g := &Generator{
+		additionalImports: []string{"time", "foo"},
+		_type:             _type,
+		sw:                new(SourceWriter),
+	}
+
+	expectedCreateInstStr := `func (q *TypeNameQuery) Create(obj *TypeName) error {
+	if result, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+		return err
+	}
+	else {
+		return nil
+	}
+}
+`
+
+	g.printCreateInstance()
+	if actualCreateInstStr := g.sw.buf.String(); actualCreateInstStr != expectedCreateInstStr {
+		t.Fatalf("Expected create instance str:\n%s\nActual create instance str:\n%s\n", expectedCreateInstStr, actualCreateInstStr)
+	}
+}

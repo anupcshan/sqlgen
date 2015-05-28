@@ -171,8 +171,30 @@ func (g *Generator) printSchemaValidation() {
 		Close()
 }
 
+func (g *Generator) printCreateInstance() {
+	var srcFieldPtrs bytes.Buffer
+	for i, field := range g._type.fields {
+		if i != 0 {
+			srcFieldPtrs.WriteString(", ")
+		}
+		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+	}
+
+	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Create(obj *%[1]s) error", g._type.name)
+	{
+		cs := method.NewCompoundStatement("if result, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String())
+		cs.Printfln("return err").Close()
+	}
+	{
+		cs := method.NewCompoundStatement("else")
+		cs.Printfln("return nil").Close()
+	}
+	method.Close()
+}
+
 func (g *Generator) Generate() {
 	g.printImports()
 	g.printQueryDeclaration()
 	g.printSchemaValidation()
+	g.printCreateInstance()
 }
