@@ -71,7 +71,7 @@ import "foo"
 `
 	g.printImports()
 	if actualImports := g.sw.buf.String(); actualImports != expectedImports {
-		t.Fatalf("Expected imports:\n%s\nActual imports:\n%s\n", expectedImports, actualImports)
+		t.Fatalf("Mismatch in imports str:\n%s\n", stringDelta(expectedImports, actualImports))
 	}
 }
 
@@ -96,7 +96,7 @@ type TypeNameQueryTx struct {
 `
 	g.printQueryDeclaration()
 	if actualQueryDecl := g.sw.buf.String(); actualQueryDecl != expectedQueryDecl {
-		t.Fatalf("Expected query declaration:\n%s\nActual query declaration:\n%s\n", expectedQueryDecl, actualQueryDecl)
+		t.Fatalf("Mismatch in query declaration str:\n%s\n", stringDelta(expectedQueryDecl, actualQueryDecl))
 	}
 }
 
@@ -126,7 +126,7 @@ func TestPrintSchemaValidation(t *testing.T) {
 
 	g.printSchemaValidation()
 	if actualSchemaVal := g.sw.buf.String(); actualSchemaVal != expectedSchemaVal {
-		t.Fatalf("Expected schema validation:\n%s\nActual schema validation:\n%s\n", expectedSchemaVal, actualSchemaVal)
+		t.Fatalf("Mismatch in schema validation str:\n%s\n", stringDelta(expectedSchemaVal, actualSchemaVal))
 	}
 }
 
@@ -149,7 +149,7 @@ func TestCreateInstance(t *testing.T) {
 
 	g.printCreateInstance()
 	if actualCreateInstStr := g.sw.buf.String(); actualCreateInstStr != expectedCreateInstStr {
-		t.Fatalf("Expected create instance str:\n%s\nActual create instance str:\n%s\n", expectedCreateInstStr, actualCreateInstStr)
+		t.Fatalf("Mismatch in create instance str:\n%s\n", stringDelta(expectedCreateInstStr, actualCreateInstStr))
 	}
 }
 
