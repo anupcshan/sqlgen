@@ -1,6 +1,10 @@
 package sqlgen
 
-import "testing"
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
 
 var _type = Type{
 	name:      "TypeName",
@@ -21,6 +25,42 @@ var _type = Type{
 			dbType:  "VARCHAR",
 		},
 	},
+}
+
+func stringDelta(expected string, actual string) string {
+	eLines := strings.Split(expected, "\n")
+	aLines := strings.Split(actual, "\n")
+	var output bytes.Buffer
+	i := 0
+
+	for i = 0; i < len(eLines) && i < len(aLines); i++ {
+		if eLines[i] == aLines[i] {
+			output.WriteString("   ")
+			output.WriteString(eLines[i])
+			output.WriteByte('\n')
+		} else {
+			output.WriteString("-- ")
+			output.WriteString(eLines[i])
+			output.WriteByte('\n')
+			output.WriteString("++ ")
+			output.WriteString(aLines[i])
+			output.WriteByte('\n')
+		}
+	}
+
+	for i = i; i < len(eLines); i++ {
+		output.WriteString("-- ")
+		output.WriteString(eLines[i])
+		output.WriteByte('\n')
+	}
+
+	for i = i; i < len(aLines); i++ {
+		output.WriteString("++ ")
+		output.WriteString(aLines[i])
+		output.WriteByte('\n')
+	}
+
+	return output.String()
 }
 
 func TestPrintAdditionalImports(t *testing.T) {
@@ -110,5 +150,28 @@ func TestCreateInstance(t *testing.T) {
 	g.printCreateInstance()
 	if actualCreateInstStr := g.sw.buf.String(); actualCreateInstStr != expectedCreateInstStr {
 		t.Fatalf("Expected create instance str:\n%s\nActual create instance str:\n%s\n", expectedCreateInstStr, actualCreateInstStr)
+	}
+}
+
+func TestCreateTransaction(t *testing.T) {
+	g := &Generator{
+		additionalImports: []string{"time", "foo"},
+		_type:             _type,
+		sw:                new(SourceWriter),
+	}
+
+	expectedCreateTxnStr := `func (q *TypeNameQuery) Transaction() (*TypeNameQueryTx, error) {
+	if tx, err := q.db.Begin(); err != nil {
+		return nil, err
+	}
+	else {
+		return &TypeNameQueryTx{tx: tx, q: q}, nil
+	}
+}
+`
+
+	g.printCreateTransaction()
+	if actualCreateTxnStr := g.sw.buf.String(); actualCreateTxnStr != expectedCreateTxnStr {
+		t.Fatalf("Mismatch in create txn str:\n%s\n", stringDelta(expectedCreateTxnStr, actualCreateTxnStr))
 	}
 }

@@ -192,9 +192,23 @@ func (g *Generator) printCreateInstance() {
 	method.Close()
 }
 
+func (g *Generator) printCreateTransaction() {
+	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Transaction() (*%[1]sQueryTx, error)", g._type.name)
+	{
+		cs := method.NewCompoundStatement("if tx, err := q.db.Begin(); err != nil")
+		cs.Printfln("return nil, err").Close()
+	}
+	{
+		cs := method.NewCompoundStatement("else")
+		cs.Printfln("return &%sQueryTx{tx: tx, q: q}, nil", g._type.name).Close()
+	}
+	method.Close()
+}
+
 func (g *Generator) Generate() {
 	g.printImports()
 	g.printQueryDeclaration()
 	g.printSchemaValidation()
 	g.printCreateInstance()
+	g.printCreateTransaction()
 }
