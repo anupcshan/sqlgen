@@ -16,9 +16,10 @@ type Field struct {
 
 // Each struct type. Maps to one table in the database.
 type Type struct {
-	name      string  // Type name in source
-	tableName string  // Table name in DB
-	fields    []Field // List of fields synced with DB
+	name        string  // Type name in source
+	tableName   string  // Table name in DB
+	fields      []Field // List of fields synced with DB
+	packageName string  // Package that new type should go into
 	// TODO: Do we need a mechanism to refer to other tables?
 }
 
@@ -96,6 +97,8 @@ type Generator struct {
 }
 
 func (g *Generator) printImports() {
+	g.sw.Printfln("package %s", g._type.packageName)
+	g.sw.AddNewline()
 	g.sw.Printfln(`import "database/sql"`)
 	for _, impt := range g.additionalImports {
 		g.sw.Printfln(`import "%s"`, impt)
@@ -207,8 +210,12 @@ func (g *Generator) printCreateTransaction() {
 
 func (g *Generator) Generate() {
 	g.printImports()
+	g.sw.AddNewline()
 	g.printQueryDeclaration()
+	g.sw.AddNewline()
 	g.printSchemaValidation()
+	g.sw.AddNewline()
 	g.printCreateInstance()
+	g.sw.AddNewline()
 	g.printCreateTransaction()
 }

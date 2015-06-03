@@ -2,6 +2,7 @@ package sqlgen
 
 import (
 	"bytes"
+	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -25,6 +26,7 @@ var _type = Type{
 			dbType:  "VARCHAR",
 		},
 	},
+	packageName: "foopackage",
 }
 
 func stringDelta(expected string, actual string) string {
@@ -64,8 +66,10 @@ func stringDelta(expected string, actual string) string {
 }
 
 func TestPrintAdditionalImports(t *testing.T) {
-	g := &Generator{additionalImports: []string{"time", "foo"}, sw: new(SourceWriter)}
-	expectedImports := `import "database/sql"
+	g := &Generator{additionalImports: []string{"time", "foo"}, sw: new(SourceWriter), _type: Type{packageName: "fpkg"}}
+	expectedImports := `package fpkg
+
+import "database/sql"
 import "time"
 import "foo"
 `
@@ -173,5 +177,20 @@ func TestCreateTransaction(t *testing.T) {
 	g.printCreateTransaction()
 	if actualCreateTxnStr := g.sw.buf.String(); actualCreateTxnStr != expectedCreateTxnStr {
 		t.Fatalf("Mismatch in create txn str:\n%s\n", stringDelta(expectedCreateTxnStr, actualCreateTxnStr))
+	}
+}
+
+func TestGenerate(t *testing.T) {
+	g := &Generator{
+		// additionalImports: []string{"time", "foo"},
+		_type: _type,
+		sw:    new(SourceWriter),
+	}
+
+	expectedBytes, _ := ioutil.ReadFile("testdata/generated/generated.go")
+	expectedStr := string(expectedBytes)
+	g.Generate()
+	if actualStr := g.sw.buf.String(); actualStr != expectedStr {
+		t.Fatalf("Mismatch in file contents:\n%s\n", stringDelta(expectedStr, actualStr))
 	}
 }
