@@ -3,6 +3,7 @@ package sqlgen
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 )
 
 // Value represents a declared field.
@@ -114,6 +115,17 @@ func (s *SourceWriter) Printfln(format string, args ...interface{}) *SourceWrite
 func (s *SourceWriter) AddNewline() *SourceWriter {
 	s.buf.WriteByte('\n')
 	return s
+}
+
+func (s *SourceWriter) Format() error {
+	formattedBytes, err := format.Source(s.buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	s.buf.Reset()
+	s.buf.Write(formattedBytes)
+	return nil
 }
 
 type Generator struct {
@@ -239,4 +251,5 @@ func (g *Generator) Generate() {
 	g.printCreateInstance()
 	g.sw.AddNewline()
 	g.printCreateTransaction()
+	g.sw.Format()
 }

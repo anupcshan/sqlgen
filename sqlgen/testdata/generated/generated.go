@@ -3,15 +3,15 @@ package foopackage
 import "database/sql"
 
 type TypeNameQuery struct {
-	db *sql.DB
-	create *sql.Stmt
-	bysrcName *sql.Stmt
+	db         *sql.DB
+	create     *sql.Stmt
+	bysrcName  *sql.Stmt
 	bySrcName2 *sql.Stmt
 }
 
 type TypeNameQueryTx struct {
 	tx *sql.Tx
-	q *TypeNameQuery
+	q  *TypeNameQuery
 }
 
 func (q *TypeNameQuery) Validate() error {
