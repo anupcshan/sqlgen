@@ -114,14 +114,20 @@ func TestPrintSchemaValidation(t *testing.T) {
 	expectedSchemaVal := `func (q *TypeNameQuery) Validate() error {
 	if stmt, err := q.db.Prepare("INSERT INTO tblName(dbName,dbName2) VALUES($1,$2)"); err != nil {
 		return err
+	} else {
+		q.create = stmt
 	}
 
 	if stmt, err := q.db.Prepare("SELECT dbName,dbName2 FROM tblName WHERE dbName=$1"); err != nil {
 		return err
+	} else {
+		q.bysrcName = stmt
 	}
 
 	if stmt, err := q.db.Prepare("SELECT dbName,dbName2 FROM tblName WHERE dbName2=$1"); err != nil {
 		return err
+	} else {
+		q.bySrcName2 = stmt
 	}
 
 	return nil
@@ -142,7 +148,7 @@ func TestCreateInstance(t *testing.T) {
 	}
 
 	expectedCreateInstStr := `func (q *TypeNameQuery) Create(obj *TypeName) error {
-	if result, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+	if _, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
 		return err
 	} else {
 		return nil
@@ -185,7 +191,7 @@ func TestGenerate(t *testing.T) {
 		sw:    new(SourceWriter),
 	}
 
-	expectedBytes, _ := ioutil.ReadFile("testdata/generated/generated.go")
+	expectedBytes, _ := ioutil.ReadFile("testdata/generated.go")
 	expectedStr := string(expectedBytes)
 	g.Generate()
 	if actualStr := g.sw.buf.String(); actualStr != expectedStr {

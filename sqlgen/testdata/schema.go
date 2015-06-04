@@ -1,9 +1,6 @@
-package testdata
+package foopackage
 
-type SrcType1 struct {
-	intField1 int
-	intField2 int64
-
-	strField  string
-	boolField bool
+type TypeName struct {
+	srcName  int64
+	SrcName2 string
 }

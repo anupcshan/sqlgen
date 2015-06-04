@@ -187,20 +187,22 @@ func (g *Generator) printSchemaValidation() {
 	}
 
 	method := g.sw.NewCompoundStatement("func (q *%sQuery) Validate() error", g._type.name)
-	cs := method.NewCompoundStatement(`if stmt, err := q.db.Prepare("INSERT INTO %s(%s) VALUES(%s)"); err != nil`,
-		g._type.tableName, dbFieldNames.String(), placeholders.String())
-	cs.
+	method.NewCompoundStatement(`if stmt, err := q.db.Prepare("INSERT INTO %s(%s) VALUES(%s)"); err != nil`,
+		g._type.tableName, dbFieldNames.String(), placeholders.String()).
 		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("q.create = stmt").
 		Close()
 
 	for _, field := range g._type.fields {
 		// TODO: Ideally, this newline would be added automatically.
 		method.AddNewline()
 
-		cs := method.NewCompoundStatement(`if stmt, err := q.db.Prepare("SELECT %s FROM %s WHERE %s=$1"); err != nil`,
-			dbFieldNames.String(), g._type.tableName, field.dbName)
-		cs.
+		method.NewCompoundStatement(`if stmt, err := q.db.Prepare("SELECT %s FROM %s WHERE %s=$1"); err != nil`,
+			dbFieldNames.String(), g._type.tableName, field.dbName).
 			Printfln("return err").
+			CloseAndReopen("else").
+			Printfln("q.by%s = stmt", field.srcName).
 			Close()
 	}
 
@@ -223,7 +225,7 @@ func (g *Generator) printCreateInstance() {
 
 	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Create(obj *%[1]s) error", g._type.name)
 	method.
-		NewCompoundStatement("if result, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String()).
+		NewCompoundStatement("if _, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String()).
 		Printfln("return err").
 		CloseAndReopen("else").
 		Printfln("return nil").
