@@ -150,9 +150,14 @@ func (g *Generator) printQueryDeclaration() {
 		cs.
 			Printfln("db *sql.DB").
 			Printfln("create *sql.Stmt")
+		pkFieldName := ""
 		for _, field := range g._type.fields {
 			cs.Printfln("by%s *sql.Stmt", field.srcName)
+			if field.isPK {
+				pkFieldName = field.srcName
+			}
 		}
+		cs.Printfln("updateBy%s *sql.Stmt", pkFieldName)
 		cs.Close()
 	}
 	// -- Query definition END

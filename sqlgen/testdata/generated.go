@@ -3,10 +3,11 @@ package foopackage
 import "database/sql"
 
 type TypeNameQuery struct {
-	db         *sql.DB
-	create     *sql.Stmt
-	bysrcName  *sql.Stmt
-	bySrcName2 *sql.Stmt
+	db              *sql.DB
+	create          *sql.Stmt
+	bysrcName       *sql.Stmt
+	bySrcName2      *sql.Stmt
+	updateBysrcName *sql.Stmt
 }
 
 type TypeNameQueryTx struct {

@@ -91,6 +91,7 @@ func TestQueryDeclaration(t *testing.T) {
 	create *sql.Stmt
 	bysrcName *sql.Stmt
 	bySrcName2 *sql.Stmt
+	updateBysrcName *sql.Stmt
 }
 
 type TypeNameQueryTx struct {
