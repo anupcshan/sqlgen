@@ -36,18 +36,19 @@ func (q *TypeNameQuery) Validate() error {
 	return nil
 }
 
-func (q *TypeNameQuery) Create(obj *TypeName) error {
-	if _, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
 func (q *TypeNameQuery) Transaction() (*TypeNameQueryTx, error) {
 	if tx, err := q.db.Begin(); err != nil {
 		return nil, err
 	} else {
 		return &TypeNameQueryTx{tx: tx, q: q}, nil
+	}
+}
+
+func (t *TypeNameQueryTx) Create(obj *TypeName) error {
+	stmt := t.tx.Stmt(t.q.create)
+	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+		return err
+	} else {
+		return nil
 	}
 }

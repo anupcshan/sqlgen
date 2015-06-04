@@ -223,9 +223,10 @@ func (g *Generator) printCreateInstance() {
 		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
 	}
 
-	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Create(obj *%[1]s) error", g._type.name)
+	method := g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Create(obj *%[1]s) error", g._type.name)
 	method.
-		NewCompoundStatement("if _, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String()).
+		Printfln("stmt := t.tx.Stmt(t.q.create)").
+		NewCompoundStatement("if _, err := stmt.Exec(%s); err != nil", srcFieldPtrs.String()).
 		Printfln("return err").
 		CloseAndReopen("else").
 		Printfln("return nil").
@@ -250,8 +251,8 @@ func (g *Generator) Generate() {
 	g.sw.AddNewline()
 	g.printSchemaValidation()
 	g.sw.AddNewline()
-	g.printCreateInstance()
-	g.sw.AddNewline()
 	g.printCreateTransaction()
+	g.sw.AddNewline()
+	g.printCreateInstance()
 	g.sw.Format()
 }

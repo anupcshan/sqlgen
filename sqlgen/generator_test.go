@@ -147,8 +147,9 @@ func TestCreateInstance(t *testing.T) {
 		sw:                new(SourceWriter),
 	}
 
-	expectedCreateInstStr := `func (q *TypeNameQuery) Create(obj *TypeName) error {
-	if _, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+	expectedCreateInstStr := `func (t *TypeNameQueryTx) Create(obj *TypeName) error {
+	stmt := t.tx.Stmt(t.q.create)
+	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
 		return err
 	} else {
 		return nil
