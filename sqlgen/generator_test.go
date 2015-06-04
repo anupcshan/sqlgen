@@ -144,8 +144,7 @@ func TestCreateInstance(t *testing.T) {
 	expectedCreateInstStr := `func (q *TypeNameQuery) Create(obj *TypeName) error {
 	if result, err := q.create.Exec(&obj.srcName, &obj.SrcName2); err != nil {
 		return err
-	}
-	else {
+	} else {
 		return nil
 	}
 }
@@ -167,8 +166,7 @@ func TestCreateTransaction(t *testing.T) {
 	expectedCreateTxnStr := `func (q *TypeNameQuery) Transaction() (*TypeNameQueryTx, error) {
 	if tx, err := q.db.Begin(); err != nil {
 		return nil, err
-	}
-	else {
+	} else {
 		return &TypeNameQueryTx{tx: tx, q: q}, nil
 	}
 }

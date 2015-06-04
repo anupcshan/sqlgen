@@ -45,12 +45,24 @@ type CompoundStatement struct {
 	sw *SourceWriter
 }
 
-func (s *SourceWriter) NewCompoundStatement(format string, args ...interface{}) *CompoundStatement {
-	s.Printf(format, args...)
+func (s *SourceWriter) newCompoundStatement(initialIndent bool, format string, args ...interface{}) *CompoundStatement {
+	if initialIndent {
+		s.Printf(format, args...)
+	} else {
+		s.printf(format, args...)
+	}
 	s.buf.Write([]byte(" {\n"))
 	s.Indent()
 
 	return &CompoundStatement{sw: s}
+}
+
+func (s *SourceWriter) NewCompoundStatement(format string, args ...interface{}) *CompoundStatement {
+	return s.newCompoundStatement(true, format, args...)
+}
+
+func (s *SourceWriter) ContinueCompoundStatement(format string, args ...interface{}) *CompoundStatement {
+	return s.newCompoundStatement(false, format, args...)
 }
 
 func (cs *CompoundStatement) Printfln(format string, args ...interface{}) *CompoundStatement {
@@ -67,18 +79,32 @@ func (cs *CompoundStatement) AddNewline() *CompoundStatement {
 	return cs
 }
 
+func (cs *CompoundStatement) CloseAndReopen(format string, args ...interface{}) *CompoundStatement {
+	cs.sw.Unindent()
+	cs.sw.Printf("} ")
+	return cs.sw.ContinueCompoundStatement(format, args...)
+}
+
 func (cs *CompoundStatement) Close() *SourceWriter {
 	cs.sw.Unindent()
 	cs.sw.Printfln("}")
 	return cs.sw
 }
 
-func (s *SourceWriter) Printf(format string, args ...interface{}) *SourceWriter {
+func (s *SourceWriter) PrintIndentation() *SourceWriter {
 	for i := 0; i < s.indentLevel; i++ {
 		s.buf.WriteByte('\t')
 	}
+	return s
+}
+
+func (s *SourceWriter) printf(format string, args ...interface{}) *SourceWriter {
 	fmt.Fprintf(&s.buf, format, args...)
 	return s
+}
+
+func (s *SourceWriter) Printf(format string, args ...interface{}) *SourceWriter {
+	return s.PrintIndentation().printf(format, args...)
 }
 
 func (s *SourceWriter) Printfln(format string, args ...interface{}) *SourceWriter {
@@ -184,27 +210,22 @@ func (g *Generator) printCreateInstance() {
 	}
 
 	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Create(obj *%[1]s) error", g._type.name)
-	{
-		cs := method.NewCompoundStatement("if result, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String())
-		cs.Printfln("return err").Close()
-	}
-	{
-		cs := method.NewCompoundStatement("else")
-		cs.Printfln("return nil").Close()
-	}
+	method.
+		NewCompoundStatement("if result, err := q.create.Exec(%s); err != nil", srcFieldPtrs.String()).
+		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("return nil").
+		Close()
 	method.Close()
 }
 
 func (g *Generator) printCreateTransaction() {
 	method := g.sw.NewCompoundStatement("func (q *%[1]sQuery) Transaction() (*%[1]sQueryTx, error)", g._type.name)
-	{
-		cs := method.NewCompoundStatement("if tx, err := q.db.Begin(); err != nil")
-		cs.Printfln("return nil, err").Close()
-	}
-	{
-		cs := method.NewCompoundStatement("else")
-		cs.Printfln("return &%sQueryTx{tx: tx, q: q}, nil", g._type.name).Close()
-	}
+	method.NewCompoundStatement("if tx, err := q.db.Begin(); err != nil").
+		Printfln("return nil, err").
+		CloseAndReopen("else").
+		Printfln("return &%sQueryTx{tx: tx, q: q}, nil", g._type.name).
+		Close()
 	method.Close()
 }
 
