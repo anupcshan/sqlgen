@@ -2,6 +2,7 @@ package sqlgen
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -29,18 +30,27 @@ var _type = Type{
 	packageName: "foopackage",
 }
 
+// TODO: Tests
 func stringDelta(expected string, actual string) string {
 	eLines := strings.Split(expected, "\n")
 	aLines := strings.Split(actual, "\n")
 	var output bytes.Buffer
 	i := 0
+	seenFirstError := false
 
 	for i = 0; i < len(eLines) && i < len(aLines); i++ {
 		if eLines[i] == aLines[i] {
+			if !seenFirstError {
+				continue
+			}
 			output.WriteString("   ")
 			output.WriteString(eLines[i])
 			output.WriteByte('\n')
 		} else {
+			if !seenFirstError {
+				output.WriteString(fmt.Sprintf("First error seen at line %d:\n", i+1))
+				seenFirstError = true
+			}
 			output.WriteString("-- ")
 			output.WriteString(eLines[i])
 			output.WriteByte('\n')
