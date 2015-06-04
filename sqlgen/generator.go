@@ -122,7 +122,7 @@ type Generator struct {
 	_type             Type          // Struct/table to be exported.
 }
 
-func (g *Generator) printImports() {
+func (g *Generator) printFileHeader() {
 	g.sw.Printfln("package %s", g._type.packageName)
 	g.sw.AddNewline()
 	g.sw.Printfln(`import "database/sql"`)
@@ -230,7 +230,7 @@ func (g *Generator) printCreateTransaction() {
 }
 
 func (g *Generator) Generate() {
-	g.printImports()
+	g.printFileHeader()
 	g.sw.AddNewline()
 	g.printQueryDeclaration()
 	g.sw.AddNewline()

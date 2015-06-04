@@ -73,7 +73,7 @@ import "database/sql"
 import "time"
 import "foo"
 `
-	g.printImports()
+	g.printFileHeader()
 	if actualImports := g.sw.buf.String(); actualImports != expectedImports {
 		t.Fatalf("Mismatch in imports str:\n%s\n", stringDelta(expectedImports, actualImports))
 	}
