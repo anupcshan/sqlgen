@@ -154,6 +154,7 @@ func (g *Generator) printQueryDeclaration() {
 		for _, field := range g._type.fields {
 			cs.Printfln("by%s *sql.Stmt", field.srcName)
 		}
+		cs.Printfln("delete *sql.Stmt")
 		cs.Printfln("update *sql.Stmt")
 		cs.Close()
 	}
@@ -192,8 +193,7 @@ func (g *Generator) printSchemaValidation() {
 		placeholders.WriteString(fmt.Sprintf("$%d", i+1))
 		if field.isPK {
 			if pKDbFieldNames.Len() != 0 {
-				pKDbFieldNames.WriteString(",")
-				pKPlaceholders.WriteString(",")
+				panic("Multiple primary key columns not implemented.")
 			}
 
 			pKDbFieldNames.WriteString(field.dbName)
@@ -241,18 +241,35 @@ func (g *Generator) printSchemaValidation() {
 
 	method.AddNewline()
 
+	method.NewCompoundStatement(`if stmt, err := q.db.Prepare("DELETE FROM %s WHERE %s=%s"); err != nil`,
+		g._type.tableName, pKDbFieldNames.String(), pKPlaceholders.String()).
+		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("q.delete = stmt").
+		Close()
+
+	method.AddNewline()
+
 	method.
 		Printfln("return nil").
 		Close()
 }
 
-func (g *Generator) printInstanceCU() {
+func (g *Generator) printInstanceCUD() {
 	var srcFieldPtrs bytes.Buffer
+	var pkSrcFieldPtrs bytes.Buffer
 	for i, field := range g._type.fields {
 		if i != 0 {
 			srcFieldPtrs.WriteString(", ")
 		}
 		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+
+		if field.isPK {
+			if pkSrcFieldPtrs.Len() != 0 {
+				panic("Multiple primary key columns not implemented.")
+			}
+			pkSrcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+		}
 	}
 
 	method := g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Create(obj *%[1]s) error", g._type.name)
@@ -270,6 +287,17 @@ func (g *Generator) printInstanceCU() {
 	method.
 		Printfln("stmt := t.tx.Stmt(t.q.update)").
 		NewCompoundStatement("if _, err := stmt.Exec(%s); err != nil", srcFieldPtrs.String()).
+		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("return nil").
+		Close()
+	method.Close()
+
+	g.sw.AddNewline()
+	method = g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Delete(obj *%[1]s) error", g._type.name)
+	method.
+		Printfln("stmt := t.tx.Stmt(t.q.delete)").
+		NewCompoundStatement("if _, err := stmt.Exec(%s); err != nil", pkSrcFieldPtrs.String()).
 		Printfln("return err").
 		CloseAndReopen("else").
 		Printfln("return nil").
@@ -306,6 +334,6 @@ func (g *Generator) Generate() {
 	g.sw.AddNewline()
 	g.printCreateTransaction()
 	g.sw.AddNewline()
-	g.printInstanceCU()
+	g.printInstanceCUD()
 	g.sw.Format()
 }

@@ -7,6 +7,7 @@ type TypeNameQuery struct {
 	create     *sql.Stmt
 	bysrcName  *sql.Stmt
 	bySrcName2 *sql.Stmt
+	delete     *sql.Stmt
 	update     *sql.Stmt
 }
 
@@ -40,6 +41,12 @@ func (q *TypeNameQuery) Validate() error {
 		q.update = stmt
 	}
 
+	if stmt, err := q.db.Prepare("DELETE FROM tblName WHERE dbName=$1"); err != nil {
+		return err
+	} else {
+		q.delete = stmt
+	}
+
 	return nil
 }
 
@@ -71,6 +78,15 @@ func (t *TypeNameQueryTx) Create(obj *TypeName) error {
 func (t *TypeNameQueryTx) Update(obj *TypeName) error {
 	stmt := t.tx.Stmt(t.q.update)
 	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (t *TypeNameQueryTx) Delete(obj *TypeName) error {
+	stmt := t.tx.Stmt(t.q.delete)
+	if _, err := stmt.Exec(&obj.srcName); err != nil {
 		return err
 	} else {
 		return nil
