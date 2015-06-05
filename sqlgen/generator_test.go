@@ -188,6 +188,14 @@ func TestCreateTransaction(t *testing.T) {
 		return &TypeNameQueryTx{tx: tx, q: q}, nil
 	}
 }
+
+func (t *TypeNameQueryTx) Commit() error {
+	return t.tx.Commit()
+}
+
+func (t *TypeNameQueryTx) Rollback() error {
+	return t.tx.Rollback()
+}
 `
 
 	g.printCreateTransaction()

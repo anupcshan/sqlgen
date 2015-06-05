@@ -247,6 +247,16 @@ func (g *Generator) printCreateTransaction() {
 		Printfln("return &%sQueryTx{tx: tx, q: q}, nil", g._type.name).
 		Close()
 	method.Close()
+
+	g.sw.AddNewline()
+	g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Commit() error", g._type.name).
+		Printfln("return t.tx.Commit()").
+		Close()
+
+	g.sw.AddNewline()
+	g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Rollback() error", g._type.name).
+		Printfln("return t.tx.Rollback()").
+		Close()
 }
 
 func (g *Generator) Generate() {

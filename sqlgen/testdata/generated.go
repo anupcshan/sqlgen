@@ -45,6 +45,14 @@ func (q *TypeNameQuery) Transaction() (*TypeNameQueryTx, error) {
 	}
 }
 
+func (t *TypeNameQueryTx) Commit() error {
+	return t.tx.Commit()
+}
+
+func (t *TypeNameQueryTx) Rollback() error {
+	return t.tx.Rollback()
+}
+
 func (t *TypeNameQueryTx) Create(obj *TypeName) error {
 	stmt := t.tx.Stmt(t.q.create)
 	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
