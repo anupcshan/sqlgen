@@ -3,11 +3,11 @@ package foopackage
 import "database/sql"
 
 type TypeNameQuery struct {
-	db              *sql.DB
-	create          *sql.Stmt
-	bysrcName       *sql.Stmt
-	bySrcName2      *sql.Stmt
-	updateBysrcName *sql.Stmt
+	db         *sql.DB
+	create     *sql.Stmt
+	bysrcName  *sql.Stmt
+	bySrcName2 *sql.Stmt
+	update     *sql.Stmt
 }
 
 type TypeNameQueryTx struct {
@@ -34,6 +34,12 @@ func (q *TypeNameQuery) Validate() error {
 		q.bySrcName2 = stmt
 	}
 
+	if stmt, err := q.db.Prepare("UPDATE tblName SET (dbName2)=($2) WHERE dbName=$1"); err != nil {
+		return err
+	} else {
+		q.update = stmt
+	}
+
 	return nil
 }
 
@@ -55,6 +61,15 @@ func (t *TypeNameQueryTx) Rollback() error {
 
 func (t *TypeNameQueryTx) Create(obj *TypeName) error {
 	stmt := t.tx.Stmt(t.q.create)
+	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (t *TypeNameQueryTx) Update(obj *TypeName) error {
+	stmt := t.tx.Stmt(t.q.update)
 	if _, err := stmt.Exec(&obj.srcName, &obj.SrcName2); err != nil {
 		return err
 	} else {

@@ -150,14 +150,11 @@ func (g *Generator) printQueryDeclaration() {
 		cs.
 			Printfln("db *sql.DB").
 			Printfln("create *sql.Stmt")
-		pkFieldName := ""
+
 		for _, field := range g._type.fields {
 			cs.Printfln("by%s *sql.Stmt", field.srcName)
-			if field.isPK {
-				pkFieldName = field.srcName
-			}
 		}
-		cs.Printfln("updateBy%s *sql.Stmt", pkFieldName)
+		cs.Printfln("update *sql.Stmt")
 		cs.Close()
 	}
 	// -- Query definition END
@@ -177,18 +174,39 @@ func (g *Generator) printQueryDeclaration() {
 }
 
 func (g *Generator) printSchemaValidation() {
-	var srcFieldPtrs bytes.Buffer
+	var nonPKDbFieldNames bytes.Buffer
+	var nonPKPlaceholders bytes.Buffer
+
+	var pKDbFieldNames bytes.Buffer
+	var pKPlaceholders bytes.Buffer
+
 	var dbFieldNames bytes.Buffer
 	var placeholders bytes.Buffer
 	for i, field := range g._type.fields {
 		if i != 0 {
-			srcFieldPtrs.WriteString(", ")
 			dbFieldNames.WriteString(",")
 			placeholders.WriteString(",")
 		}
-		srcFieldPtrs.WriteString(fmt.Sprintf("&obj.%s", field.srcName))
+
 		dbFieldNames.WriteString(field.dbName)
 		placeholders.WriteString(fmt.Sprintf("$%d", i+1))
+		if field.isPK {
+			if pKDbFieldNames.Len() != 0 {
+				pKDbFieldNames.WriteString(",")
+				pKPlaceholders.WriteString(",")
+			}
+
+			pKDbFieldNames.WriteString(field.dbName)
+			pKPlaceholders.WriteString(fmt.Sprintf("$%d", i+1))
+		} else {
+			if nonPKDbFieldNames.Len() != 0 {
+				nonPKDbFieldNames.WriteString(",")
+				nonPKPlaceholders.WriteString(",")
+			}
+
+			nonPKDbFieldNames.WriteString(field.dbName)
+			nonPKPlaceholders.WriteString(fmt.Sprintf("$%d", i+1))
+		}
 	}
 
 	method := g.sw.NewCompoundStatement("func (q *%sQuery) Validate() error", g._type.name)
@@ -214,12 +232,21 @@ func (g *Generator) printSchemaValidation() {
 	// TODO: Ideally, this newline would be added automatically.
 	method.AddNewline()
 
+	method.NewCompoundStatement(`if stmt, err := q.db.Prepare("UPDATE %s SET (%s)=(%s) WHERE %s=%s"); err != nil`,
+		g._type.tableName, nonPKDbFieldNames.String(), nonPKPlaceholders.String(), pKDbFieldNames.String(), pKPlaceholders.String()).
+		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("q.update = stmt").
+		Close()
+
+	method.AddNewline()
+
 	method.
 		Printfln("return nil").
 		Close()
 }
 
-func (g *Generator) printCreateInstance() {
+func (g *Generator) printInstanceCU() {
 	var srcFieldPtrs bytes.Buffer
 	for i, field := range g._type.fields {
 		if i != 0 {
@@ -231,6 +258,17 @@ func (g *Generator) printCreateInstance() {
 	method := g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Create(obj *%[1]s) error", g._type.name)
 	method.
 		Printfln("stmt := t.tx.Stmt(t.q.create)").
+		NewCompoundStatement("if _, err := stmt.Exec(%s); err != nil", srcFieldPtrs.String()).
+		Printfln("return err").
+		CloseAndReopen("else").
+		Printfln("return nil").
+		Close()
+	method.Close()
+
+	g.sw.AddNewline()
+	method = g.sw.NewCompoundStatement("func (t *%[1]sQueryTx) Update(obj *%[1]s) error", g._type.name)
+	method.
+		Printfln("stmt := t.tx.Stmt(t.q.update)").
 		NewCompoundStatement("if _, err := stmt.Exec(%s); err != nil", srcFieldPtrs.String()).
 		Printfln("return err").
 		CloseAndReopen("else").
@@ -268,6 +306,6 @@ func (g *Generator) Generate() {
 	g.sw.AddNewline()
 	g.printCreateTransaction()
 	g.sw.AddNewline()
-	g.printCreateInstance()
+	g.printInstanceCU()
 	g.sw.Format()
 }
