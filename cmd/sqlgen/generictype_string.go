@@ -9,7 +9,7 @@ const _GenericType_name = "GT_NUMERICGT_STRINGGT_TIMESTAMP"
 var _GenericType_index = [...]uint8{0, 10, 19, 31}
 
 func (i GenericType) String() string {
-	if i < 0 || i+1 >= GenericType(len(_GenericType_index)) {
+	if i < 0 || i >= GenericType(len(_GenericType_index)-1) {
 		return fmt.Sprintf("GenericType(%d)", i)
 	}
 	return _GenericType_name[_GenericType_index[i]:_GenericType_index[i+1]]
