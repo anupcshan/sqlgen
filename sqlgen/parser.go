@@ -26,13 +26,14 @@ func NewParser() *Parser {
 	return &Parser{files: []*File{}}
 }
 
-func (p *Parser) AddDirectory(directory string) error {
+func (p *Parser) AddDirectory(directory string) {
 	p.dir = directory
 	glog.Infof("Adding directory: %s\n", directory)
+	glog.Infof("Source directories: %s\n", build.Default.SrcDirs())
 
-	pkg, err := build.Default.ImportDir(directory, 0)
+	pkg, err := build.ImportDir(directory, 0)
 	if err != nil {
-		return err
+		glog.Fatalf("Error importing directory: %s\n", err)
 	}
 
 	// Currently, we don't include CgoFiles, TestGoFiles, SFiles etc...
@@ -43,8 +44,6 @@ func (p *Parser) AddDirectory(directory string) error {
 		p.files[i] = new(File)
 		p.files[i].name = fName
 	}
-
-	return nil
 }
 
 func (p *Parser) ParseFiles() {
@@ -56,5 +55,8 @@ func (p *Parser) ParseFiles() {
 			glog.Fatalf("Error parsing file: %s\n", err)
 		}
 		file.parsedText = parsedFile
+		for _, imp := range parsedFile.Imports {
+			glog.Infof("Import: %s\n", imp.Path.Value)
+		}
 	}
 }

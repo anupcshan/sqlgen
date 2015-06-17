@@ -2,13 +2,22 @@ package main
 
 import (
 	"flag"
+	"os"
 
 	"github.com/anupcshan/sqlgen/sqlgen"
-	"github.com/golang/glog"
+)
+
+var (
+	typeNames = flag.String("type", "", "comma-separated list of type names [required]")
 )
 
 func main() {
 	flag.Parse()
+
+	if len(*typeNames) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	args := flag.Args()
 	if len(args) == 0 {
@@ -18,9 +27,7 @@ func main() {
 	parser := sqlgen.NewParser()
 
 	for _, dir := range args {
-		if err := parser.AddDirectory(dir); err != nil {
-			glog.Fatalf("Error adding directory: %s\n", err)
-		}
+		parser.AddDirectory(dir)
 	}
 
 	parser.ParseFiles()
